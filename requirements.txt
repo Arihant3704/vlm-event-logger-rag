@@ -1,0 +1,6 @@
+opencv-python
+pillow
+chromadb
+sentence-transformers
+requests
+numpy

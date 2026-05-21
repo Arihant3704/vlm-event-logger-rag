@@ -1,0 +1,23 @@
+# Python caching
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Databases & Vector store (very large binary files)
+chroma_db/
+
+# Local raw logs and outputs
+event_logs.jsonl
+test_result.md
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env
+
+# Video files (do not upload large raw media)
+*.mp4
+*.avi
+*.mkv
+*.mov
