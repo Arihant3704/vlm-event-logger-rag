@@ -142,8 +142,48 @@ chmod +x start.sh
 
 ---
 
-## 🏷️ Suggested Repository Names
-- `semantic-surveillance-rag` (Recommended: clear, describes both domain and technology)
-- `vlm-event-logger-rag`
-- `smart-eye-rag`
-- `local-vision-rag`
+## 📊 Example Run & Output (Proof of Work)
+
+Below is an end-to-end integration test run output of the pipeline on a surveillance video.
+
+### 🛠️ Test Setup Details
+- **Video Source**: `/home/docketrun/Videos/teshandu.mp4` (~2m54s duration)
+- **Processing Rate**: `5.0 FPM` (1 frame captured every 12 seconds)
+- **Total Frames Logged**: 14 frames
+- **Vector Ingestion**: ChromaDB (14 entries indexed)
+
+### 🔍 Semantic Search Retrieval
+**User Query:** *"What vehicles (like forklifts or trucks) are seen in the video, where are they, and what are workers doing near them?"*
+
+The system retrieved these top 5 matching events from the local database:
+
+1. **`[01:00 Video Time]`**: The image captures a bustling scene at a factory, with numerous workers and machines scattered throughout the space. The factory floor is filled with various types of machinery, including forklifts and conveyor belts, indicating a well-organized production environment...
+2. **`[00:24 Video Time]`**: The image captures a bustling factory scene, with workers diligently operating various machines and equipment throughout the space. The factory floor is filled with yellow machinery and conveyor belts...
+3. **`[00:12 Video Time]`**: The image captures a bustling scene inside a large warehouse, with workers diligently performing their tasks on the factory floor... Several workers can be seen scattered throughout the space, engaged in various activities such as loading or unloading goods from trucks parked nearby. The warehouse is filled with numerous vehicles, including several trucks of different sizes and colors...
+4. **`[02:36 Video Time]`**: The image captures a bustling factory scene, with workers diligently operating various machines and equipment throughout the space...
+5. **`[00:48 Video Time]`**: The image captures a bustling factory scene, with workers diligently operating various machines and equipment throughout the space...
+
+### 🤖 Generated AI Summary (Qwen 3.5 0.8B)
+
+> Based on the provided event logs, I can identify the following information regarding the vehicles, their locations, and the workers' activities near them:
+> 
+> 1. **Vehicles:**
+>    - **Forklifts** and **trucks** are explicitly mentioned in the logs.
+>    - **Log entry [00:12] (Warehouse)** notes *"several trucks of different sizes and colors... used for transportation and storage purposes."*
+>    - **Log entry [01:00] (Factory)** and **Log entry [02:36] (Factory)** identify *"forklifts"* as part of the machinery.
+>    - **Log entry [00:24] (Factory)** mentions *"conveyor belts"* as part of the equipment layout.
+> 
+> 2. **Locations:**
+>    - The images capture a **factory** and a **warehouse**.
+>    - **Log entry [01:00]** describes a *"bustling scene at a factory."*
+>    - **Log entry [00:12]** describes a *"large warehouse."*
+> 
+> 3. **Workers' Activities:**
+>    - Workers are seen *"diligently operating various machines and equipment throughout the space"* in the factory and warehouse.
+>    - **Log entry [00:24]** and **Log entry [00:12]** indicate workers are *"engaged in their respective tasks"* on the factory floor.
+>    - **Log entry [00:48] (Factory)** describes workers operating *"various machines and equipment."*
+>    - **Log entry [00:12]** specifically mentions workers *"loading or unloading goods from trucks parked nearby."*
+> 
+> **Summary Conclusion:**
+> There are vehicles such as **forklifts** and **trucks** present in the **factory** and **warehouse** environments. The workers are engaged in various tasks including **operating machines**, **loading/unloading goods from trucks**, and **working on the factory floor**.
+
