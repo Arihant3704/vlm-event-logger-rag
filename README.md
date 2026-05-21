@@ -39,6 +39,23 @@ graph TD
 
 ---
 
+## 💻 Hardware & Model Requirements
+
+Because this pipeline loads and unloads models dynamically between steps, it can run comfortably on consumer-grade hardware with limited VRAM.
+
+### Local Models (Ollama)
+| Model | Type | Parameters | VRAM Requirement | RAM/Disk Size |
+|---|---|---|---|---|
+| **Moondream** | Vision-Language Model (VLM) | ~860M | ~2.2 GB | ~1.6 GB |
+| **Qwen 3.5 0.8B** | Text LLM (RAG Reasoner) | ~800M | ~1.2 GB | ~1.0 GB |
+
+### GPU / Hardware Recommendations
+- **Minimum VRAM**: **4 GB** (e.g., NVIDIA T4, RTX 3050, RTX 2060).
+- **Recommended VRAM**: **6 GB+** (e.g., RTX 3060, RTX 4060) for faster model switching and inference.
+- **Dynamic VRAM Optimization**: The system automatically unloads the VLM (Moondream) from the GPU memory (`keep_alive: 0`) before launching Qwen. This caps the peak VRAM usage to **~2.5 GB**, ensuring it runs safely without out-of-memory crashes on low-end systems.
+
+---
+
 ## ⚙️ How it Works
 
 ### 1. VLM Event Logger (`logger.py`)
