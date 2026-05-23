@@ -130,6 +130,20 @@ chmod +x start.sh
 
 ---
 
+## 🖥️ Interactive Gradio Dashboard (Web UI)
+
+The system features a professional-grade dark mode **Gradio Web Dashboard** for local operation.
+
+![Dashboard Preview](assets/dashboard.png)
+
+### 🚀 Key Web UI Features:
+1. **Live Feed Logging Control**: Drag-and-drop video upload (or configure webcam inputs), adjust processing rate (FPM), and start/stop real-time background description generation.
+2. **Interactive Video Player (Jump-to-Seek)**: Integrated HTML5 video player component. Click any `🎬 Seek Frame` button inside your search results to jump the player instantly to that exact timestamp for event verification.
+3. **Real-time Security Alerts**: Customize safety alert keyword triggers (e.g., `fire, smoke, accident, hazard`). The VLM scans live descriptions and flags any dangerous events immediately in a warning stream panel.
+4. **Clean Semantic Search Filtering**: Rejects ChromaDB's low-relevance padding. Enforces a strict distance threshold filtering of `distance <= 1.45` to only display authentic matching events.
+
+---
+
 ## 📁 Repository Structure
 
 ```
