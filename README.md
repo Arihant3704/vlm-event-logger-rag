@@ -1,5 +1,7 @@
 # 👁️ SemanticSurveillance-RAG
 
+![System Architecture Flow](assets/architecture_diagram.png)
+
 A high-efficiency, privacy-first local surveillance system that replaces resource-heavy video storage with semantic, searchable event logs. 
 
 By analyzing video feeds frame-by-frame with a Vision-Language Model (VLM), the system converts visual details into structured JSONL logs. These logs are vectorized and indexed into a local vector database, enabling you to query your visual history using natural language (RAG).
