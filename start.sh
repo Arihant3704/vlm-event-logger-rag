@@ -43,7 +43,7 @@ case $choice in
         echo "Done. Don't forget to run Option 2 to index them."
         ;;
     5)
-        echo "Launching Gradio Dashboard Web UI on http://localhost:7860 ..."
+        echo "Launching Gradio Dashboard Web UI on http://localhost:7865 ..."
         python3 app.py
         ;;
     6)

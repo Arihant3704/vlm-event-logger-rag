@@ -23,6 +23,9 @@ logging_thread = None
 latest_frame = None
 latest_status = "System Ready. Start the logger to process video frames."
 event_list = []
+alerts_list = []  # State for security alerts
+alert_keywords = ["fire", "accident", "danger", "smoke", "fall", "spill"]
+active_video_path = None
 
 # Helper to encode OpenCV frame to base64
 def encode_image(frame):
@@ -44,10 +47,30 @@ def get_vlm_description(image_base64):
     except Exception as e:
         return f"VLM Error: {str(e)}"
 
+# Helper to parse video timestamps (e.g. "[01:12 Video Time]") to seconds
+def parse_timestamp_to_seconds(timestamp):
+    try:
+        # Extract the time string, e.g. "01:12" from "[01:12 Video Time]"
+        clean = timestamp.replace("[", "").replace("]", "").strip()
+        time_part = clean.split(" ")[0]  # Get "01:12"
+        parts = time_part.split(":")
+        if len(parts) == 2:
+            return int(parts[0]) * 60 + int(parts[1])
+        elif len(parts) == 3:
+            return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+    except Exception:
+        pass
+    return 0
+
 # Background logging worker
-def logging_worker(video_source, fpm):
-    global logging_active, latest_frame, latest_status, event_list
+def logging_worker(video_source, fpm, alert_rules_str):
+    global logging_active, latest_frame, latest_status, event_list, alerts_list, alert_keywords
     
+    # Update active alert keywords from input
+    alert_keywords = [k.strip().lower() for k in alert_rules_str.split(",") if k.strip()]
+    if not alert_keywords:
+        alert_keywords = ["fire", "accident", "danger", "smoke", "fall", "spill"]
+
     # Try parsing video source as integer (webcam index)
     try:
         source = int(video_source)
@@ -75,7 +98,7 @@ def logging_worker(video_source, fpm):
     while logging_active:
         ret, frame = cap.read()
         if not ret:
-            latest_status = "🏁 Completed: End of video file reached."
+            latest_status = "🏁 Completed: End of video feed."
             break
 
         should_process = False
@@ -96,7 +119,6 @@ def logging_worker(video_source, fpm):
                 timestamp = f"[{mins:02d}:{secs:02d} Video Time]"
 
         if should_process:
-            # Resize frame for UI preview and fast encoding
             h, w = frame.shape[:2]
             max_size = 640
             if max(h, w) > max_size:
@@ -105,7 +127,7 @@ def logging_worker(video_source, fpm):
             else:
                 preview_frame = frame.copy()
 
-            # Convert BGR to RGB for Gradio
+            # Convert BGR to RGB for Gradio Image Preview
             rgb_frame = cv2.cvtColor(preview_frame, cv2.COLOR_BGR2RGB)
             latest_frame = rgb_frame
 
@@ -122,40 +144,51 @@ def logging_worker(video_source, fpm):
             with open(LOG_FILE, "a") as f:
                 f.write(json.dumps(log_entry) + "\n")
 
-            # Add to state list
+            # Add to description logs
             event_list.append(f"{timestamp} - {description}")
             latest_status = f"✅ Logged {timestamp}: {description}"
 
+            # Check Alert Rules
+            desc_lower = description.lower()
+            triggered_alerts = [kw for kw in alert_keywords if kw in desc_lower]
+            for kw in triggered_alerts:
+                alert_msg = f"🚨 {timestamp} Alert triggered: '{kw.upper()}' detected! Description: {description}"
+                alerts_list.append(alert_msg)
+
         frame_counter += 1
-        # Prevent CPU spinning
         time.sleep(0.01)
 
     cap.release()
     logging_active = False
 
 # Gradio Event: Start Logger
-def start_logging(video_source, uploaded_file, fpm):
-    global logging_active, logging_thread, latest_status, event_list
+def start_logging(video_source, uploaded_file, fpm, alert_rules):
+    global logging_active, logging_thread, latest_status, event_list, alerts_list, active_video_path
     
     if logging_active:
-        return "Logger is already running!", None, gr.update()
+        return "Logger is already running!", None, gr.update(), gr.update()
 
     # Use uploaded file if present
     source = video_source
     if uploaded_file is not None:
         source = uploaded_file.name
+        active_video_path = source  # Update active path for player
+    else:
+        active_video_path = source if not source.isdigit() else None
 
     if not source:
-        return "❌ Please enter a video source or upload a file.", None, gr.update()
+        return "❌ Please enter a video source or upload a file.", None, gr.update(), gr.update()
 
     logging_active = True
     event_list = []
+    alerts_list = []  # Clear previous alerts
     
-    logging_thread = threading.Thread(target=logging_worker, args=(source, fpm))
+    logging_thread = threading.Thread(target=logging_worker, args=(source, fpm, alert_rules))
     logging_thread.daemon = True
     logging_thread.start()
 
-    return "🔄 Initializing logging worker...", None, gr.update(value="Stop Logger", variant="stop")
+    # We return the video file path to the video player if it is a local video file
+    return "🔄 Initializing logging worker...", None, gr.update(value="Stop Logger", variant="stop"), active_video_path
 
 # Gradio Event: Stop Logger
 def stop_logging():
@@ -166,11 +199,26 @@ def stop_logging():
         return "⏹️ Stopping logger...", gr.update(value="Start Logger", variant="primary")
     return "Logger is not running.", gr.update(value="Start Logger", variant="primary")
 
-# Gradio Event: Update UI Loop (Called by Timer)
+# Gradio Event: Update UI elements (Called by Timer)
 def update_ui_status():
-    global latest_frame, latest_status, event_list
+    global latest_frame, latest_status, event_list, alerts_list
+    
     logs_text = "\n".join(reversed(event_list)) if event_list else "No logs captured yet."
-    return latest_frame, latest_status, logs_text
+    
+    # Format security alerts layout
+    if alerts_list:
+        alerts_html = "<div style='display:flex; flex-direction:column; gap:8px;'>"
+        for alert in reversed(alerts_list):
+            alerts_html += f"""
+            <div style='background:rgba(239,68,68,0.15); padding:10px; border-radius:8px; border-left:4px solid #ef4444; color:#fca5a5;'>
+                {alert}
+            </div>
+            """
+        alerts_html += "</div>"
+    else:
+        alerts_html = "<div style='color:#94a3b8; font-style:italic;'>No alerts triggered.</div>"
+
+    return latest_frame, latest_status, logs_text, alerts_html
 
 # Gradio Event: Index Logs
 def run_indexer():
@@ -199,8 +247,9 @@ def run_indexer():
             metadatas.append({"timestamp": entry["timestamp"]})
 
         if documents:
+            # Overwrite or add to index
             collection.add(ids=ids, documents=documents, metadatas=metadatas)
-            return f"🎉 Success: Vectorized and indexed {len(documents)} event logs into ChromaDB!"
+            return f"🎉 Success: Indexed {len(documents)} event logs into ChromaDB!"
         else:
             return "⚠️ No logs found to index."
     except Exception as e:
@@ -212,7 +261,6 @@ def perform_search(query):
         return "Please enter a query.", ""
 
     try:
-        # 1. Search DB
         client = chromadb.PersistentClient(path=CHROMA_PATH)
         embedding_func = embedding_functions.DefaultEmbeddingFunction()
         collection = client.get_collection(
@@ -225,16 +273,29 @@ def perform_search(query):
         if not results['documents'][0]:
             return "No relevant events found in database.", "No matches."
 
-        # Format retrieved logs for UI display
-        retrieved_html = "<div style='display:flex; flex-direction:column; gap:8px;'>"
+        # Format retrieved logs with 'Click to Seek Video' interactive buttons
+        retrieved_html = "<div style='display:flex; flex-direction:column; gap:10px;'>"
         context = ""
         for i in range(len(results['documents'][0])):
             doc = results['documents'][0][i]
             meta = results['metadatas'][0][i]
             context += f"{meta['timestamp']}: {doc}\n"
+            
+            # Calculate time seek offset in seconds
+            seek_seconds = parse_timestamp_to_seconds(meta['timestamp'])
+            
+            # Render a card with an inline JS onclick handler targeting the gradio HTML5 video player
             retrieved_html += f"""
-            <div style='background:rgba(255,255,255,0.05); padding:10px; border-radius:8px; border-left:4px solid #10b981;'>
-                <strong style='color:#10b981;'>{meta['timestamp']}</strong>: {doc}
+            <div style='background:rgba(255,255,255,0.03); padding:12px; border-radius:10px; border-left:4px solid #10b981; display:flex; justify-content:space-between; align-items:center;'>
+                <div style='flex:1; padding-right:15px;'>
+                    <strong style='color:#10b981;'>{meta['timestamp']}</strong>: {doc}
+                </div>
+                <button onclick="let v = document.querySelector('video'); if(v) {{ v.currentTime = {seek_seconds}; v.play(); }}" 
+                        style='background:#10b981; color:white; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-weight:600; font-size:0.85rem; transition: background 0.2s;'
+                        onmouseover='this.style.background=\"#059669\"'
+                        onmouseout='this.style.background=\"#10b981\"'>
+                    🎬 Seek Frame
+                </button>
             </div>
             """
         retrieved_html += "</div>"
@@ -272,7 +333,7 @@ Answer:"""
     except Exception as e:
         return f"❌ Search Error: {str(e)} (Make sure database is indexed)", ""
 
-# Custom stylesheet for modern, premium dark aesthetic
+# Custom CSS for UI styling
 CSS = """
 body {
     background-color: #090d16 !important;
@@ -281,7 +342,7 @@ body {
 .gradio-container {
     border-radius: 20px !important;
     border: 1px solid rgba(255, 255, 255, 0.05) !important;
-    background: rgba(13, 20, 35, 0.7) !important;
+    background: rgba(13, 20, 35, 0.75) !important;
     backdrop-filter: blur(20px) !important;
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4) !important;
     padding: 24px !important;
@@ -298,11 +359,16 @@ body {
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     padding-bottom: 15px;
 }
+.video-preview-holder {
+    background: rgba(0,0,0,0.5) !important;
+    border-radius: 8px !important;
+    overflow: hidden;
+}
 """
 
 with gr.Blocks(css=CSS, title="Semantic Surveillance Dashboard") as demo:
     
-    with gr.Div(elem_classes=["title-bar"]):
+    with gr.Group(elem_classes=["title-bar"]):
         gr.Markdown(
             """
             # 👁️ Semantic Surveillance & Local RAG Dashboard
@@ -311,9 +377,9 @@ with gr.Blocks(css=CSS, title="Semantic Surveillance Dashboard") as demo:
         )
 
     with gr.Row():
-        # LEFT COLUMN: INGESTION & PIPELINE
-        with gr.Column(scale=1, elem_classes=["panel-border"]):
-            gr.Markdown("### 📹 Video Source & Logger")
+        # LEFT COLUMN: INGESTION & VIDEO PLAYBACK
+        with gr.Column(scale=1.1, elem_classes=["panel-border"]):
+            gr.Markdown("### 📹 Video Source & Player")
             
             video_input = gr.Textbox(
                 value="0",
@@ -344,21 +410,41 @@ with gr.Blocks(css=CSS, title="Semantic Surveillance Dashboard") as demo:
                 interactive=False
             )
             
-            frame_preview = gr.Image(
-                label="Latest Processed Frame",
+            # Interactive HTML5 Video Player
+            video_player = gr.Video(
+                label="Active Video Playback (Jump-to-Seek Target)",
                 interactive=False,
-                height=250
+                elem_classes=["video-preview-holder"]
+            )
+            
+            # Sub-frame preview (VLM scanner snapshot)
+            frame_preview = gr.Image(
+                label="Latest VLM Scanner Capture",
+                interactive=False,
+                height=180
             )
 
-        # MIDDLE COLUMN: EVENT LOGS
-        with gr.Column(scale=1, elem_classes=["panel-border"]):
-            gr.Markdown("### 📜 Real-time Visual Logs")
+        # MIDDLE COLUMN: EVENT LOGS & ALERTS
+        with gr.Column(scale=1.1, elem_classes=["panel-border"]):
+            gr.Markdown("### 🚨 Alert Settings & Activity Stream")
             
+            alert_rules_input = gr.Textbox(
+                value="fire, smoke, accident, danger, vehicle",
+                label="Alert Trigger Keywords (Comma separated)",
+                placeholder="fire, danger, intrusion"
+            )
+            
+            gr.Markdown("#### 🔴 Active Security Alarms")
+            alerts_display = gr.HTML(
+                value="<div style='color:#94a3b8; font-style:italic;'>No alerts triggered.</div>"
+            )
+            
+            gr.Markdown("#### 📜 Rolling Descriptions Stream")
             rolling_logs = gr.TextArea(
                 value="No logs captured yet.",
-                label="Description Stream (Newest First)",
+                label="Visual Feed Description logs (Newest First)",
                 interactive=False,
-                lines=15
+                lines=10
             )
             
             index_btn = gr.Button("📂 Index Logs into Vector DB", variant="secondary")
@@ -367,8 +453,8 @@ with gr.Blocks(css=CSS, title="Semantic Surveillance Dashboard") as demo:
                 interactive=False
             )
 
-        # RIGHT COLUMN: RAG SEARCH & ANALYSIS
-        with gr.Column(scale=1.2, elem_classes=["panel-border"]):
+        # RIGHT COLUMN: RAG SEARCH & INTERACTIVE RETRIEVAL
+        with gr.Column(scale=1.3, elem_classes=["panel-border"]):
             gr.Markdown("### 🧠 Semantic AI Search (RAG)")
             
             search_input = gr.Textbox(
@@ -378,13 +464,13 @@ with gr.Blocks(css=CSS, title="Semantic Surveillance Dashboard") as demo:
             
             search_btn = gr.Button("🔍 Query Database", variant="primary")
             
+            gr.Markdown("#### 🤖 AI Synthesized Summary")
             ai_answer = gr.Markdown(
-                value="*Ask a question above to retrieve events and synthesize answers.*",
-                label="AI Summary"
+                value="*Ask a question above to retrieve events and synthesize answers.*"
             )
             
+            gr.Markdown("#### 🎬 Retrieved Events (Click 'Seek Frame' to control Player)")
             retrieved_events = gr.HTML(
-                label="Retrieved Event Context",
                 value="<div style='color:#6b7280; font-style:italic;'>No search performed yet.</div>"
             )
 
@@ -393,14 +479,14 @@ with gr.Blocks(css=CSS, title="Semantic Surveillance Dashboard") as demo:
     timer.tick(
         fn=update_ui_status,
         inputs=[],
-        outputs=[frame_preview, status_box, rolling_logs]
+        outputs=[frame_preview, status_box, rolling_logs, alerts_display]
     )
 
     # Button click mappings
     start_btn.click(
         fn=start_logging,
-        inputs=[video_input, file_uploader, fpm_slider],
-        outputs=[status_box, frame_preview, start_btn]
+        inputs=[video_input, file_uploader, fpm_slider, alert_rules_input],
+        outputs=[status_box, frame_preview, start_btn, video_player]
     )
     
     stop_btn.click(
@@ -422,4 +508,4 @@ with gr.Blocks(css=CSS, title="Semantic Surveillance Dashboard") as demo:
     )
 
 if __name__ == "__main__":
-    demo.launch(server_name="0.0.0.0", server_port=7860)
+    demo.launch(server_name="0.0.0.0", server_port=7865)
