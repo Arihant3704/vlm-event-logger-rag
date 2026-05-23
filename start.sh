@@ -2,10 +2,40 @@
 
 # VLM Event Logger & RAG Search Starter
 
+# Check and install python dependencies if missing
+echo "🔍 Checking Python dependencies..."
+python3 -c "import gradio, PIL, chromadb, sentence_transformers, cv2" 2>/dev/null
+if [ $? -ne 0 ]; then
+    echo "⚠️ Missing dependencies. Installing from requirements.txt..."
+    pip3 install -r requirements.txt
+else
+    echo "✅ Python dependencies are satisfied."
+fi
+
 # Check if Ollama is running
+echo "🔍 Checking Ollama server..."
 if ! curl -s http://localhost:11434/api/tags > /dev/null; then
-    echo "Error: Ollama is not running. Please start it first."
+    echo "❌ Error: Ollama is not running. Please start it first (run 'ollama serve' in another terminal)."
     exit 1
+fi
+echo "✅ Ollama server is running."
+
+# Check and pull models if missing
+echo "🔍 Checking local models..."
+OLLAMA_TAGS=$(curl -s http://localhost:11434/api/tags)
+
+if ! echo "$OLLAMA_TAGS" | grep -q "moondream"; then
+    echo "📥 Downloading 'moondream' VLM model..."
+    ollama pull moondream
+else
+    echo "✅ 'moondream' VLM model is already downloaded."
+fi
+
+if ! echo "$OLLAMA_TAGS" | grep -q "qwen3.5:0.8b"; then
+    echo "📥 Downloading 'qwen3.5:0.8b' LLM model..."
+    ollama pull qwen3.5:0.8b
+else
+    echo "✅ 'qwen3.5:0.8b' LLM model is already downloaded."
 fi
 
 echo "------------------------------------------"
