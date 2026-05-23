@@ -124,6 +124,9 @@ chmod +x start.sh
   - Opens a prompt where you can query your logs using natural language.
 * **Option 4: Generate Dummy Logs**
   - Generates fake surveillance logs for system testing and validation.
+* **Option 5: Launch Gradio Dashboard (Web UI)**
+  - Runs a web server locally (defaults to `http://localhost:7860`). Allows visual configuration, real-time logging, live video frame review, database indexing, and a full chatbot interface for RAG searches.
+
 
 ---
 

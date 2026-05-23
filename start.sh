@@ -15,7 +15,8 @@ echo "1) Start Logger (Watch Video/Camera)"
 echo "2) Run Indexer (Update Vector DB)"
 echo "3) Start RAG Search (Ask questions)"
 echo "4) Generate Dummy Logs (For testing)"
-echo "5) Exit"
+echo "5) Launch Gradio Dashboard (Web UI)"
+echo "6) Exit"
 echo "------------------------------------------"
 read -p "Choose an option: " choice
 
@@ -42,6 +43,10 @@ case $choice in
         echo "Done. Don't forget to run Option 2 to index them."
         ;;
     5)
+        echo "Launching Gradio Dashboard Web UI on http://localhost:7860 ..."
+        python3 app.py
+        ;;
+    6)
         echo "Exiting."
         exit 0
         ;;

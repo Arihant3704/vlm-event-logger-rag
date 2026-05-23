@@ -4,3 +4,4 @@ chromadb
 sentence-transformers
 requests
 numpy
+gradio
