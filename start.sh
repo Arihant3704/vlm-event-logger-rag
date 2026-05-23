@@ -2,6 +2,15 @@
 
 # VLM Event Logger & RAG Search Starter
 
+# Cleanup function to unload models from Ollama GPU memory on exit or Ctrl+C
+cleanup() {
+    echo -e "\n🧹 Script exiting. Unloading models from Ollama GPU memory..."
+    curl -s -X POST http://localhost:11434/api/generate -d '{"model": "moondream", "keep_alive": 0}' > /dev/null
+    curl -s -X POST http://localhost:11434/api/generate -d '{"model": "qwen3.5:0.8b", "keep_alive": 0}' > /dev/null
+    echo "✅ GPU memory freed."
+}
+trap cleanup EXIT INT TERM
+
 # Check and install python dependencies if missing
 echo "🔍 Checking Python dependencies..."
 python3 -c "import gradio, PIL, chromadb, sentence_transformers, cv2" 2>/dev/null
