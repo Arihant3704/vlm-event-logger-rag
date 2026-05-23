@@ -270,13 +270,21 @@ def perform_search(query):
 
         results = collection.query(query_texts=[query], n_results=5)
         
-        if not results['documents'][0]:
-            return "No relevant events found in database.", "No matches."
+        # Filter by semantic distance threshold (1.45)
+        threshold = 1.45
+        valid_indices = []
+        if results['documents'] and results['documents'][0]:
+            for i in range(len(results['documents'][0])):
+                if results['distances'][0][i] <= threshold:
+                    valid_indices.append(i)
+
+        if not valid_indices:
+            return "No relevant events found in database matching your query.", "<div style='color:#94a3b8; font-style:italic;'>No matches found under relevance threshold.</div>"
 
         # Format retrieved logs with 'Click to Seek Video' interactive buttons
         retrieved_html = "<div style='display:flex; flex-direction:column; gap:10px;'>"
         context = ""
-        for i in range(len(results['documents'][0])):
+        for i in valid_indices:
             doc = results['documents'][0][i]
             meta = results['metadatas'][0][i]
             context += f"{meta['timestamp']}: {doc}\n"

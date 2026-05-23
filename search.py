@@ -23,7 +23,25 @@ def search_events(query, n_results=5):
         n_results=n_results
     )
     
-    return results
+    # Filter by relevance distance threshold (1.45)
+    threshold = 1.45
+    filtered_results = {
+        'ids': [[]],
+        'documents': [[]],
+        'metadatas': [[]],
+        'distances': [[]]
+    }
+    
+    if results['documents'] and results['documents'][0]:
+        for i in range(len(results['documents'][0])):
+            dist = results['distances'][0][i]
+            if dist <= threshold:
+                filtered_results['ids'][0].append(results['ids'][0][i])
+                filtered_results['documents'][0].append(results['documents'][0][i])
+                filtered_results['metadatas'][0].append(results['metadatas'][0][i])
+                filtered_results['distances'][0].append(dist)
+                
+    return filtered_results
 
 def generate_answer(query, search_results):
     # Free up VRAM by unloading Moondream
